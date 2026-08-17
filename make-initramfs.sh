@@ -17,8 +17,18 @@ echo "==> kernel release: $RELEASE"
 
 # --- 1. static busybox ---
 echo "==> fetching static aarch64 busybox"
-curl -sL "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/busybox-static-1.36.1-r31.apk" \
-    -o "$TMP/bbx.apk"
+# resolve latest busybox-static version from Alpine index (avoid hardcoded 404s)
+BBX_URL=""
+for i in 1 2 3; do
+    BBX_URL="$(curl -sL "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/APKINDEX.tar.gz" \
+        | tar -xzO APKINDEX 2>/dev/null \
+        | awk '/^P:busybox-static$/{f=1;next} f&&/^V:/{v=substr($0,3); print "https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/busybox-static-"v".apk"; exit}')"
+    [ -n "$BBX_URL" ] && break
+    sleep 2
+done
+[ -n "$BBX_URL" ] || BBX_URL="https://dl-cdn.alpinelinux.org/alpine/v3.20/main/aarch64/busybox-static-1.36.1-r31.apk"
+echo "    busybox URL: $BBX_URL"
+curl -sL "$BBX_URL" -o "$TMP/bbx.apk"
 mkdir -p "$TMP/bbx"
 tar xzf "$TMP/bbx.apk" -C "$TMP/bbx"
 mkdir -p "$TMP/bin"
@@ -87,6 +97,8 @@ print(f"    {len(kept)} module files copied")
 PYEOF
 
 # --- 3. init script ---
+# create mount points inside the cpio (they are not in the archive)
+mkdir -p "$TMP/proc" "$TMP/sys" "$TMP/dev" "$TMP/mnt" "$TMP/etc"
 cat > "$TMP/init" << 'INITEOF'
 #!/bin/sh
 # C13 minimal initramfs init: mount /proc /sys /dev, load display
@@ -94,6 +106,7 @@ cat > "$TMP/init" << 'INITEOF'
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
 echo "[init] C13 initramfs starting"
+mkdir -p /proc /sys /dev /mnt
 mount -t proc proc /proc 2>/dev/null
 mount -t sysfs sysfs /sys 2>/dev/null
 mount -t devtmpfs devtmpfs /dev 2>/dev/null
@@ -102,13 +115,16 @@ mdev -s 2>/dev/null || true
 # Try to load the msm display stack (needed for DRM console / fbcon)
 if ls /lib/modules/*/kernel/drivers/gpu/drm/msm/msm.ko* >/dev/null 2>&1; then
     echo "[init] loading msm display stack"
+    # modprobe first (needs modules.dep); fall back to insmod in dep order
     modprobe msm 2>/dev/null || {
-        # fallback: load deps in order then msm
         for m in drm drm_kms_helper drm_shmem_helper gpu-sched \
                  drm_display_helper drm_dp_aux_bus drm_exec drm_client_lib \
-                 aux-bridge drm_gpuvm; do
+                 aux-bridge drm_gpuvm drm_panel_orientation_quirks; do
             insmod /lib/modules/*/kernel/drivers/gpu/drm/$m.ko* 2>/dev/null || true
         done
+        insmod /lib/modules/*/kernel/drivers/soc/qcom/mdt_loader.ko* 2>/dev/null || true
+        insmod /lib/modules/*/kernel/drivers/soc/qcom/ubwc_config.ko* 2>/dev/null || true
+        insmod /lib/modules/*/kernel/drivers/media/cec/core/cec.ko* 2>/dev/null || true
         insmod /lib/modules/*/kernel/drivers/gpu/drm/msm/msm.ko* 2>/dev/null || true
     }
 fi
@@ -119,7 +135,7 @@ echo "[init] scanning for rootfs"
 for dev in /dev/sd?[0-9] /dev/mmcblk?p[0-9] /dev/block/platform/*/by-name/*; do
     [ -b "$dev" ] || continue
     case "$dev" in
-        *boot*|*recovery*|*persist*|*modem*|*dsp*) continue;;
+        *boot*|*recovery*|*persist*|*modem*|*dsp*|*misc*|*splash*) continue;;
     esac
     mkdir -p /mnt
     if mount -t ext4 "$dev" /mnt 2>/dev/null || \
@@ -142,6 +158,8 @@ chmod 755 "$TMP/init"
 
 # --- 4. pack ---
 echo "==> packing initramfs"
-( cd "$TMP" && find . -print0 | cpio --null -o -H newc 2>/dev/null | gzip -9 > "$OUT_GZ" )
+rm -rf "$TMP/bbx" "$TMP/bbx.apk"
+OUT_GZ_ABS="$(realpath -m "$OUT_GZ")"
+( cd "$TMP" && find . -print0 | cpio --null -o -H newc 2>/dev/null | gzip -9 > "$OUT_GZ_ABS" )
 
-echo "==> done: $OUT_GZ ($(stat -c%s "$OUT_GZ") bytes)"
+echo "==> done: $OUT_GZ ($(stat -c%s "$OUT_GZ_ABS") bytes)"

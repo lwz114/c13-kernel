@@ -15,7 +15,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          sudo apt-get install -y gcc-aarch64-linux-gnu cpio gzip
 
       - name: Fetch msm8996-mainline kernel (v6.19.5-msm8996)
         run: |
@@ -61,8 +61,9 @@ jobs:
 
       - name: Build Linux initramfs (display modules + switch_root)
         run: |
-          # modules_install output is at ../modules (lib/modules/<release>)
-          bash ../make-initramfs.sh ../modules ../initramfs-linux.gz
+          # NOTE: each step starts at the repo root ($GITHUB_WORKSPACE).
+          # modules_install output is at ./modules (lib/modules/<release>).
+          bash make-initramfs.sh modules initramfs-linux.gz
 
       - name: Package boot.img (Linux initramfs, not stock Android ramdisk)
         run: |
@@ -83,7 +84,7 @@ jobs:
           name: c13-boot
           path: |
             linux/boot-c13-linux.img
-            linux/initramfs-linux.gz
+            initramfs-linux.gz
             modules.tar
             linux/arch/arm64/boot/Image.gz
             linux/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb
