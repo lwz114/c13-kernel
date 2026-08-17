@@ -322,10 +322,10 @@ index 000000000..2863d41a1
 +};
 diff --git a/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts b/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts
 new file mode 100644
-index 000000000..f3ec01e54
+index 000000000..948c3771b
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts
-@@ -0,0 +1,868 @@
+@@ -0,0 +1,881 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Readboy C13 (读书郎 C13) - Snapdragon 820 / MSM8996 education tablet
@@ -1193,6 +1193,19 @@ index 000000000..f3ec01e54
 +		drive-strength = <2>;
 +		bias-disable;
 +	};
++};
++
++/*
++ * The MDP SMMU context banks are used by the bootloader (ABL) for the
++ * splash screen (and possibly by TZ). Do not reset/repurpose them on
++ * probe, otherwise the kernel crashes and reboots as soon as the MDP
++ * SMMU is initialized (same issue as on the Xiaomi Mi Note 2 - see
++ * postmarketOS wiki). qcom,no-smr-check avoids touching the stream
++ * match registers as well.
++ */
++&mdp_smmu {
++	qcom,skip-init;
++	qcom,no-smr-check;
 +};
 diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
 index dc9e9e42a..b7d014e87 100644

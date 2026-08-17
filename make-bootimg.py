@@ -28,7 +28,7 @@ def main():
     struct.pack_into('<I', hdr, 0x2c, 0x0e041000)  # os_version (Android 7.1.2)
     hdr[0x40:0x40 + len(cmdline)] = cmdline
 
-    out = bytearray(align(header_size, page))
+    out = bytearray(hdr) + bytearray(align(header_size, page) - len(hdr))
     out += kernel
     out += b'\x00' * (align(len(kernel), page) - len(kernel))
     out += ramdisk
