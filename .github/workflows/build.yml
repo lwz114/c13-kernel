@@ -49,7 +49,10 @@ jobs:
       - name: Build kernel
         run: |
           cd linux
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz dtbs
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz dtbs modules
+          mkdir -p ../modules
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../modules modules_install
+          tar cf ../modules.tar -C ../modules lib
 
       - name: Package boot.img
         run: |
@@ -66,5 +69,6 @@ jobs:
           name: c13-boot
           path: |
             linux/boot-c13.img
+            modules.tar
             linux/arch/arm64/boot/Image.gz
             linux/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb
