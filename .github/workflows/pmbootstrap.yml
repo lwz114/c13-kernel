@@ -26,9 +26,14 @@ jobs:
           cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/ 2>/dev/null || true
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
           
-          # 【核心修复】自动清理 APKBUILD 里属于 Ubuntu 的依赖包名，适配 Alpine 环境
+          # 【终极修复】将常见的 Ubuntu/Debian 编译依赖名全自动翻译成 Alpine 格式
           sed -i 's/gcc-aarch64-linux-gnu//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/build-essential//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
           sed -i 's/device-tree-compiler/dtc/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/libelf-dev/elfutils-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/libssl-dev/openssl-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/libncurses-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/libncurses5-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
 
       - name: pmbootstrap init
         run: |
