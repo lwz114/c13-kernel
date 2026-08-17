@@ -31,25 +31,23 @@ jobs:
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           
-          # 先通过 config 子命令直接写入核心配置
-          pmbootstrap -p ./pmaports config aports_channel edge
-          pmbootstrap -p ./pmaports config arch aarch64
+          # 仅写入目前支持的合法 config 变量
           pmbootstrap -p ./pmaports config device readboy-c13
           pmbootstrap -p ./pmaports config ui phosh
           
-          # 使用 printf 输入连续回车，全自动跳过 init 的交互式确认提示
-          printf "\n\n\n\n\n\n\n\n\n\n\n\n" | pmbootstrap -p ./pmaports init
+          # 使用 yes "" 发送无限次回车，全自动确认所有 init 默认项
+          yes "" | pmbootstrap -p ./pmaports init
 
       - name: Build kernel package
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          pmbootstrap -p ./pmaports -y build linux-c13 --arch=aarch64
+          pmbootstrap -p ./pmaports build linux-c13 --arch=aarch64
 
       - name: Build rootfs image
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           # 生成 tar 压缩包根文件系统
-          pmbootstrap -p ./pmaports -y install --tar --non-interactive
+          pmbootstrap -p ./pmaports install --tar
 
       - name: Prepare Artifacts
         run: |
