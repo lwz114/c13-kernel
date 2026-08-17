@@ -14,7 +14,6 @@ jobs:
       - name: Install pmbootstrap
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu device-tree-compiler cpio
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           sudo ln -sf "$(pwd)/pmbootstrap/pmbootstrap.py" /usr/local/bin/pmbootstrap
 
@@ -26,12 +25,15 @@ jobs:
           cp -r device/linux-c13 pmaports/device/testing/ 2>/dev/null || true
           cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/ 2>/dev/null || true
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
+          
+          # 【核心修复】自动清理 APKBUILD 里属于 Ubuntu 的依赖包名，适配 Alpine 环境
+          sed -i 's/gcc-aarch64-linux-gnu//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          sed -i 's/device-tree-compiler/dtc/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
 
       - name: pmbootstrap init
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           
-          # 先生成合法的默认配置，再强制覆盖目标参数
           yes "" | pmbootstrap -p $(pwd)/pmaports init
           pmbootstrap -p $(pwd)/pmaports config device readboy-c13
           pmbootstrap -p $(pwd)/pmaports config ui phosh
