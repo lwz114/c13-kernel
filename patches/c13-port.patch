@@ -1194,6 +1194,65 @@ index 000000000..f3ec01e54
 +		bias-disable;
 +	};
 +};
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index dc9e9e42a..b7d014e87 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -1372,6 +1372,30 @@ blsp1_spi1_sleep: blsp1-spi1-sleep-state {
+ 				bias-pull-down;
+ 			};
+ 
++			blsp1_spi5_default: blsp1-spi5-default-state {
++				spi-pins {
++					pins = "gpio81", "gpio82", "gpio83", "gpio84";
++					function = "blsp_spi5";
++					drive-strength = <6>;
++					bias-disable;
++				};
++
++				cs-pins {
++					pins = "gpio83";
++					function = "gpio";
++					drive-strength = <6>;
++					bias-disable;
++					output-high;
++				};
++			};
++
++			blsp1_spi5_sleep: blsp1-spi5-sleep-state {
++				pins = "gpio81", "gpio82", "gpio83", "gpio84";
++				function = "gpio";
++				drive-strength = <2>;
++				bias-pull-down;
++			};
++
+ 			blsp2_uart2_2pins_default: blsp2-uart2-2pins-state {
+ 				pins = "gpio4", "gpio5";
+ 				function = "blsp_uart8";
+@@ -3302,6 +3326,23 @@ blsp1_spi1: spi@7575000 {
+ 			status = "disabled";
+ 		};
+ 
++		blsp1_spi5: spi@7579000 {
++			compatible = "qcom,spi-qup-v2.2.1";
++			reg = <0x07579000 0x600>;
++			interrupts = <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_QUP5_SPI_APPS_CLK>,
++				 <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++			pinctrl-names = "default", "sleep";
++			pinctrl-0 = <&blsp1_spi5_default>;
++			pinctrl-1 = <&blsp1_spi5_sleep>;
++			dmas = <&blsp1_dma 20>, <&blsp1_dma 21>;
++			dma-names = "tx", "rx";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		blsp1_i2c3: i2c@7577000 {
+ 			compatible = "qcom,i2c-qup-v2.2.1";
+ 			reg = <0x07577000 0x1000>;
 diff --git a/arch/arm64/configs/msm8996-c13.fragment b/arch/arm64/configs/msm8996-c13.fragment
 new file mode 100644
 index 000000000..2b3acc53b
@@ -3820,3 +3879,15 @@ index 000000000..126a48980
 +MODULE_AUTHOR("Readboy C13 mainline port");
 +MODULE_DESCRIPTION("Readboy C13 10.1 inch DSI panel driver");
 +MODULE_LICENSE("GPL");
+diff --git a/drivers/regulator/qcom-labibb-regulator.c b/drivers/regulator/qcom-labibb-regulator.c
+index 1b14015ca..451a75ca5 100644
+--- a/drivers/regulator/qcom-labibb-regulator.c
++++ b/drivers/regulator/qcom-labibb-regulator.c
+@@ -754,6 +754,7 @@ static const struct labibb_regulator_data pmi8998_labibb_data[] = {
+ 
+ static const struct of_device_id qcom_labibb_match[] = {
+ 	{ .compatible = "qcom,pmi8998-lab-ibb", .data = &pmi8998_labibb_data},
++	{ .compatible = "qcom,pmi8996-lab-ibb", .data = &pmi8998_labibb_data},
+ 	{ },
+ };
+ MODULE_DEVICE_TABLE(of, qcom_labibb_match);
