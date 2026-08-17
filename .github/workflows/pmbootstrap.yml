@@ -27,7 +27,7 @@ jobs:
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
 
           # 生成完美契合 Alpine/pmOS 规范的纯净 APKBUILD
-          # 【核心修复】修复 Maintainer 字段的 RFC822 邮箱格式要求
+          # 修复 Maintainer 字段的 RFC822 邮箱格式要求
           cat << 'EOF' > pmaports/device/testing/linux-c13/APKBUILD
           # Maintainer: Readboy C13 <maintainer@example.com>
           pkgname=linux-c13
@@ -101,13 +101,19 @@ jobs:
       - name: Build rootfs image
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          pmbootstrap -p $(pwd)/pmaports install --tar
+          # 【修复】去掉了 --tar 参数，正常执行安装
+          pmbootstrap -p $(pwd)/pmaports install
 
       - name: Prepare Artifacts
         run: |
+          export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           mkdir -p output
-          sudo cp /tmp/pmos/images/readboy-c13/*.tar.xz output/ 2>/dev/null || \
-          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/tmp/rootfs.tar.xz output/ 2>/dev/null || true
+          
+          # 【修复】使用 export 命令自动汇总镜像文件
+          pmbootstrap -p $(pwd)/pmaports export
+          
+          # 【修复】使用 -L 参数跟随软链接，提取真实的物理文件
+          sudo cp -rL /tmp/postmarketOS-export/* output/ 2>/dev/null || true
           sudo chown -R $USER:$USER output/
 
       - name: Upload artifacts
