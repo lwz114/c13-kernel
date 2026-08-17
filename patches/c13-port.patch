@@ -322,10 +322,10 @@ index 000000000..2863d41a1
 +};
 diff --git a/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts b/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts
 new file mode 100644
-index 000000000..948c3771b
+index 000000000..35ba61435
 --- /dev/null
 +++ b/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dts
-@@ -0,0 +1,881 @@
+@@ -0,0 +1,889 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/*
 + * Readboy C13 (读书郎 C13) - Snapdragon 820 / MSM8996 education tablet
@@ -945,8 +945,7 @@ index 000000000..948c3771b
 +	als31300@60 {
 +		compatible = "allegro,als31300";
 +		reg = <0x60>;
-+		interrupt-parent = <&tlmm>;
-+		interrupts = <117 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
 +	};
 +
 +	ak09970d@11 {
@@ -1005,11 +1004,11 @@ index 000000000..948c3771b
 +
 +&usb3 {
 +	status = "okay";
-+	extcon = <&tusb320>;
 +};
 +
 +&usb3_dwc3 {
-+	extcon = <&tusb320>;
++	/* Force peripheral (gadget) mode - no Type-C role detection yet */
++	dr_mode = "peripheral";
 +
 +	/* USB2 only on this device */
 +	phys = <&hsusb_phy1>;
@@ -1204,6 +1203,15 @@ index 000000000..948c3771b
 + * match registers as well.
 + */
 +&mdp_smmu {
++	status = "disabled";
++
++	/*
++	 * The bootloader (ABL) keeps the MDP SMMU configured for the splash
++	 * screen. Trying to take it over from Linux currently crashes the
++	 * kernel (SMMU register access faults). Display is driven by the
++	 * simple-framebuffer console instead, so keep this SMMU off until
++	 * the takeover problem is solved.
++	 */
 +	qcom,skip-init;
 +	qcom,no-smr-check;
 +};

@@ -27,12 +27,24 @@ jobs:
           cd linux
           git apply --verbose ../patches/c13-port.patch
 
-      - name: Configure (pmOS config)
+      - name: Configure (pmOS config + C13 additions)
         run: |
           cd linux
           cp ../config/config-postmarketos-qcom-msm8996.aarch64 .config
+          # Built-in USB gadget (ECM network + serial) so the initramfs
+          # can bring up a USB SSH/serial console without modules
+          cat >> .config << 'C13CFG'
+          CONFIG_USB_LIBCOMPOSITE=y
+          CONFIG_USB_F_ECM=y
+          CONFIG_USB_F_SERIAL=y
+          CONFIG_USB_F_ACM=y
+          CONFIG_USB_CONFIGFS=y
+          CONFIG_USB_CONFIGFS_ECM=y
+          CONFIG_USB_CONFIGFS_ACM=y
+          CONFIG_USB_GADGETFS=y
+          C13CFG
           make ARCH=arm64 olddefconfig
-          grep -E "CONFIG_(ARCH_QCOM|FB_SIMPLE|FRAMEBUFFER_CONSOLE)" .config | head
+          grep -E "CONFIG_(ARCH_QCOM|FB_SIMPLE|FRAMEBUFFER_CONSOLE|USB_CONFIGFS=|USB_F_ECM=)" .config | head
 
       - name: Build kernel
         run: |
