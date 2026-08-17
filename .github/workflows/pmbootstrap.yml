@@ -31,13 +31,10 @@ jobs:
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           
-          # 初始化空配置并写入设备参数
-          mkdir -p ~/.config
-          echo "[pmbootstrap]" > ~/.config/pmbootstrap.cfg
+          # 先生成合法的默认配置，再强制覆盖目标参数
+          yes "" | pmbootstrap -p $(pwd)/pmaports init
           pmbootstrap -p $(pwd)/pmaports config device readboy-c13
           pmbootstrap -p $(pwd)/pmaports config ui phosh
-          
-          # 全自动执行 init 初始化
           yes "" | pmbootstrap -p $(pwd)/pmaports init
 
       - name: Build kernel package
