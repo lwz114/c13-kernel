@@ -52,28 +52,38 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz dtbs modules
           mkdir -p ../modules
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../modules modules_install
-          # Keep only display/panel related modules (trim 176MB -> ~25MB)
+          # Keep only display/panel modules + their deps (trim ~177MB -> ~25MB)
           cd ../modules/lib/modules/*/
-          find kernel -name '*.ko*' | grep -vE 'kernel/drivers/(gpu/drm|video/backlight|regulator|iio|input|net|sound|media|usb|mmc|ufs)' | xargs rm -f 2>/dev/null || true
+          find kernel -name '*.ko*' | grep -vE 'kernel/drivers/(gpu/drm|video/backlight|soc/qcom|media/cec)' | xargs rm -f 2>/dev/null || true
           find kernel -type d -empty -delete 2>/dev/null || true
           cd - >/dev/null
           tar cf ../modules.tar -C ../modules lib
 
-      - name: Package boot.img
+      - name: Build Linux initramfs (display modules + switch_root)
+        run: |
+          # modules_install output is at ../modules (lib/modules/<release>)
+          bash ../make-initramfs.sh ../modules ../initramfs-linux.gz
+
+      - name: Package boot.img (Linux initramfs, not stock Android ramdisk)
         run: |
           cd linux
           # kernel + appended C13 DTB, stock header layout
           cat arch/arm64/boot/Image.gz arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb \
               > Image.gz-dtb
-          python3 ../make-bootimg.py Image.gz-dtb ../config/ramdisk.gz boot-c13.img \
-            "console=ttyMSM1,115200,n8 console=tty0 androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 cma=32M loglevel=8"
+          python3 ../make-bootimg.py Image.gz-dtb ../initramfs-linux.gz boot-c13-linux.img \
+            "console=ttyMSM1,115200,n8 console=tty0 androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 cma=32M loglevel=4 clk_ignore_unused panic=30"
+          # sanity: boot partition on C13 is 64MB
+          ls -l boot-c13-linux.img
+          test "$(stat -c%s boot-c13-linux.img)" -lt $((64*1024*1024)) || \
+            { echo "FATAL: boot.img exceeds 64MB boot partition"; exit 1; }
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: c13-boot
           path: |
-            linux/boot-c13.img
+            linux/boot-c13-linux.img
+            linux/initramfs-linux.gz
             modules.tar
             linux/arch/arm64/boot/Image.gz
             linux/arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb
