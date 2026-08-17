@@ -1,4 +1,4 @@
-name: pmbootstrap-build
+Name: pmbootstrap-build
 
 on:
   workflow_dispatch:
@@ -21,40 +21,43 @@ jobs:
       - name: Setup pmaports
         run: |
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git
-          # overlay our device + kernel packages
+          # 覆盖自定义设备与内核
           cp -r device/device-readboy-c13 pmaports/device/testing/
           cp -r device/linux-c13 pmaports/device/testing/
-          # put our kernel config/patch next to the APKBUILD
           cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/
 
       - name: pmbootstrap init
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          pmbootstrap -y init \
-            --aports ./pmaports \
+          # -p 必须放在主命令后，移除废弃的 --nonfree 和 --mirror-alpine
+          pmbootstrap -p ./pmaports -y init \
+            --aports-channel edge \
+            --arch aarch64 \
             --device readboy-c13 \
-            --nonfree \
-            --mirror-alpine http://dl-cdn.alpinelinux.org/alpine/
+            --ui phosh
 
       - name: Build kernel package
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          pmbootstrap -y build linux-c13 --arch=aarch64
+          pmbootstrap -p ./pmaports -y build linux-c13 --arch=aarch64
 
-      - name: Build image
+      - name: Build rootfs image
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          pmbootstrap -y install \
-            --sdcard /dev/null \
-            --no-sshd 2>/dev/null || \
-          pmbootstrap -y install --no-sshd 2>&1 | tail -20
+          # 生成 tar 压缩包根文件系统，极简且不易死锁
+          pmbootstrap -p ./pmaports -y install --tar --non-interactive
+
+      - name: Prepare Artifacts
+        run: |
+          mkdir -p output
+          sudo cp /tmp/pmos/images/readboy-c13/*.tar.xz output/ 2>/dev/null || \
+          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/tmp/rootfs.tar.xz output/ 2>/dev/null || \
+          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/var/tmp/*.img output/ 2>/dev/null || true
+          sudo chown -R $USER:$USER output/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pmos-image
-          path: |
-            /tmp/pmos/rootfs_*/*.img
-            /tmp/pmos/rootfs_*/*.boot.img
-            /tmp/pmos/rootfs_*/*/*.img
+          name: pmos-c13-image
+          path: output/
