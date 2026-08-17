@@ -35,8 +35,15 @@ jobs:
           sed -i 's/libncurses-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
           sed -i 's/libncurses5-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
 
-          # 【核心修复：修复内核源码未触发下载的 BUG】
+          # 【核心修复1：修复内核源码未触发下载的 BUG】
           sed -i 's/source="linux.tar.gz/source="linux.tar.gz::$_kernelsrc/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          
+          # 【核心修复2：彻底移除 Ubuntu 的交叉编译器硬编码】
+          # 让 Alpine 自己的跨平台编译系统接管 gcc，防止 command not found
+          sed -i 's/CROSS_COMPILE=aarch64-linux-gnu-//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          
+          # 【核心修复3：补充缺失的内核编译依赖 bc】
+          sed -i 's/makedepends="/makedepends="bc ncurses-dev /g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
 
       - name: pmbootstrap init
         run: |
@@ -65,7 +72,7 @@ jobs:
         if: failure()
         run: |
           echo "==================== [崩溃日志] 编译内核报错 ===================="
-          cat ~/.local/var/pmbootstrap/log.txt | tail -n 150 || true
+          cat ~/.local/var/pmbootstrap/log.txt | tail -n 200 || true
           echo "=================================================================="
 
       - name: Build rootfs image
