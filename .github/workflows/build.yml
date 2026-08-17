@@ -52,6 +52,11 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz dtbs modules
           mkdir -p ../modules
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../modules modules_install
+          # Keep only display/panel related modules (trim 176MB -> ~25MB)
+          cd ../modules/lib/modules/*/
+          find kernel -name '*.ko*' | grep -vE 'kernel/drivers/(gpu/drm|video/backlight|regulator|iio|input|net|sound|media|usb|mmc|ufs)' | xargs rm -f 2>/dev/null || true
+          find kernel -type d -empty -delete 2>/dev/null || true
+          cd - >/dev/null
           tar cf ../modules.tar -C ../modules lib
 
       - name: Package boot.img
