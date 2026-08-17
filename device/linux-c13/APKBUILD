@@ -1,0 +1,38 @@
+# Maintainer: Readboy C13 port
+pkgname=linux-c13
+pkgver=6.19.5
+pkgrel=0
+pkgdesc="MSM8996 mainline kernel with Readboy C13 support"
+arch="aarch64"
+url="https://gitlab.com/msm8996-mainline/linux"
+license="GPL-2.0-only"
+options="!strip !check !tracedeps"
+makedepends="bison flex openssl-dev perl python3 gcc-aarch64-linux-gnu libelf-dev"
+_kernelsrc="https://gitlab.com/msm8996-mainline/linux/-/archive/v6.19.5-msm8996/linux-v6.19.5-msm8996.tar.gz"
+source="linux.tar.gz
+	config-c13.aarch64
+	c13-port.patch"
+builddir="$srcdir/linux"
+
+prepare() {
+	default_prepare || true
+	tar xzf "$srcdir/linux.tar.gz" -C "$srcdir" 2>/dev/null || true
+	mv "$srcdir"/linux-* "$builddir" 2>/dev/null || true
+	cd "$builddir"
+	git apply --verbose "$srcdir/c13-port.patch" 2>/dev/null || patch -p1 < "$srcdir/c13-port.patch"
+	cp "$srcdir/config-c13.aarch64" .config
+	make ARCH=arm64 olddefconfig
+}
+
+build() {
+	unset LDFLAGS
+	cd "$builddir"
+	make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz dtbs modules
+}
+
+package() {
+	cd "$builddir"
+	install -Dm644 arch/arm64/boot/Image.gz "$pkgdir/boot/vmlinuz"
+	install -Dm644 arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb "$pkgdir/boot/msm8996-readboy-c13.dtb"
+	make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="$pkgdir" modules_install
+}

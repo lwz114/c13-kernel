@@ -1,0 +1,59 @@
+name: pmbootstrap-build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pmbootstrap
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu device-tree-compiler cpio
+          sudo pip install --break-system-packages pmbootstrap
+
+      - name: Setup pmaports
+        run: |
+          git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git
+          # overlay our device + kernel packages
+          cp -r device/device-readboy-c13 pmaports/device/testing/
+          cp -r device/linux-c13 pmaports/device/testing/
+          # put our kernel config/patch next to the APKBUILD
+          cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/
+          cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/
+
+      - name: pmbootstrap init
+        run: |
+          export PMBOOTSTRAP_WORKDIR=/tmp/pmos
+          pmbootstrap -y init \
+            --aports ./pmaports \
+            --device readboy-c13 \
+            --nonfree \
+            --mirror-alpine http://dl-cdn.alpinelinux.org/alpine/
+
+      - name: Build kernel package
+        run: |
+          export PMBOOTSTRAP_WORKDIR=/tmp/pmos
+          pmbootstrap -y build linux-c13 --arch=aarch64
+
+      - name: Build image
+        run: |
+          export PMBOOTSTRAP_WORKDIR=/tmp/pmos
+          pmbootstrap -y install \
+            --sdcard /dev/null \
+            --no-sshd 2>/dev/null || \
+          pmbootstrap -y install --no-sshd 2>&1 | tail -20
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pmos-image
+          path: |
+            /tmp/pmos/rootfs_*/*.img
+            /tmp/pmos/rootfs_*/*.boot.img
+            /tmp/pmos/rootfs_*/*/*.img

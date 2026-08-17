@@ -1,0 +1,13 @@
+# Maintainer: Readboy C13 port
+pkgname=device-readboy-c13
+pkgver=1
+pkgrel=0
+pkgdesc="Readboy C13 (读书郎 C13) tablet"
+url="https://github.com/lwz114/c13-kernel"
+license="MIT"
+arch="aarch64"
+options="!check !archcheck"
+depends="linux-c13"
+source="deviceinfo"
+install="device-install"
+subpackages=""
