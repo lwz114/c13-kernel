@@ -15,7 +15,7 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu android-tools-mkbootimg
+          sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Fetch msm8996-mainline kernel (v6.19.5-msm8996)
         run: |
@@ -45,18 +45,8 @@ jobs:
           # kernel + appended C13 DTB, stock header layout
           cat arch/arm64/boot/Image.gz arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb \
               > Image.gz-dtb
-          mkbootimg \
-            --kernel Image.gz-dtb \
-            --ramdisk ../config/ramdisk.gz \
-            --base 0x80000000 \
-            --kernel_offset 0x8000 \
-            --ramdisk_offset 0x1000000 \
-            --second_offset 0xf00000 \
-            --tags_offset 0x100 \
-            --pagesize 4096 \
-            --header_version 0 \
-            --cmdline "console=ttyMSM1,115200,n8 console=tty0 androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 cma=32M loglevel=8" \
-            -o boot-c13.img
+          python3 ../make-bootimg.py Image.gz-dtb ../config/ramdisk.gz boot-c13.img \
+            "console=ttyMSM1,115200,n8 console=tty0 androidboot.hardware=qcom user_debug=31 msm_rtb.filter=0x237 cma=32M loglevel=8"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
