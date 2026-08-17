@@ -17,38 +17,61 @@ jobs:
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git
           sudo ln -sf "$(pwd)/pmbootstrap/pmbootstrap.py" /usr/local/bin/pmbootstrap
 
-      - name: Setup pmaports
+      - name: Setup pmaports & Rewrite APKBUILD
         run: |
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git
-          # 覆盖自定义设备与内核
+          # 拷贝设备配置（跳过原有残缺的 APKBUILD）
           cp -r device/device-readboy-c13 pmaports/device/testing/ 2>/dev/null || true
-          cp -r device/linux-c13 pmaports/device/testing/ 2>/dev/null || true
+          mkdir -p pmaports/device/testing/linux-c13
           cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/ 2>/dev/null || true
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
-          
-          # 【自动清理 Ubuntu 依赖包名】
-          sed -i 's/gcc-aarch64-linux-gnu//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/build-essential//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/device-tree-compiler/dtc/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/libelf-dev/elfutils-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/libssl-dev/openssl-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/libncurses-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
-          sed -i 's/libncurses5-dev/ncurses-dev/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
 
-          # 【核心修复1：修复内核源码未触发下载的 BUG】
-          sed -i 's/source="linux.tar.gz/source="linux.tar.gz::$_kernelsrc/g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          # 【终极大招】原地生成一个完美契合 Alpine/pmOS 规范的纯净 APKBUILD！
+          # 砍掉所有 Ubuntu 特供写法、错误的跳转、以及重复打补丁逻辑
+          cat << 'EOF' > pmaports/device/testing/linux-c13/APKBUILD
+          # Maintainer: Readboy C13 port
+          pkgname=linux-c13
+          pkgver=6.19.5
+          pkgrel=0
+          pkgdesc="MSM8996 mainline kernel with Readboy C13 support"
+          arch="aarch64"
+          url="https://gitlab.com/msm8996-mainline/linux"
+          license="GPL-2.0-only"
+          options="!strip !check !tracedeps"
+          makedepends="bc bison flex openssl-dev perl python3 elfutils-dev ncurses-dev"
+          _kernelsrc="https://gitlab.com/msm8996-mainline/linux/-/archive/v6.19.5-msm8996/linux-v6.19.5-msm8996.tar.gz"
           
-          # 【核心修复2：彻底移除 Ubuntu 的交叉编译器硬编码】
-          # 让 Alpine 自己的跨平台编译系统接管 gcc，防止 command not found
-          sed -i 's/CROSS_COMPILE=aarch64-linux-gnu-//g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          # 正确触发下载，自动引入补丁和配置
+          source="linux.tar.gz::$_kernelsrc
+                  config-c13.aarch64
+                  c13-port.patch"
           
-          # 【核心修复3：补充缺失的内核编译依赖 bc】
-          sed -i 's/makedepends="/makedepends="bc ncurses-dev /g' pmaports/device/testing/linux-c13/APKBUILD 2>/dev/null || true
+          # 对应 GitLab 默认解压的根文件夹名，精准跳转，无需 mv
+          builddir="$srcdir/linux-v6.19.5-msm8996"
+
+          prepare() {
+              # 自动应用 c13-port.patch
+              default_prepare
+              cp "$srcdir/config-c13.aarch64" .config
+              make ARCH=arm64 olddefconfig
+          }
+
+          build() {
+              unset LDFLAGS
+              # 移除写死的交叉编译器，让 Alpine crossdirect 全权接管
+              make ARCH=arm64 -j$(nproc) Image.gz dtbs modules
+          }
+
+          package() {
+              install -Dm644 arch/arm64/boot/Image.gz "$pkgdir/boot/vmlinuz"
+              install -Dm644 arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb "$pkgdir/boot/msm8996-readboy-c13.dtb"
+              make ARCH=arm64 INSTALL_MOD_PATH="$pkgdir" modules_install
+          }
+          EOF
 
       - name: pmbootstrap init
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          
           yes "" | pmbootstrap -p $(pwd)/pmaports init
           pmbootstrap -p $(pwd)/pmaports config device readboy-c13
           pmbootstrap -p $(pwd)/pmaports config ui phosh
@@ -59,11 +82,7 @@ jobs:
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
           
           echo "==================== [执行] 重新计算校验和 ===================="
-          pmbootstrap -p $(pwd)/pmaports checksum linux-c13 || { 
-            echo "==================== [崩溃日志] 校验和失败原因 ====================";
-            cat ~/.local/var/pmbootstrap/log.txt | tail -n 100;
-            exit 1; 
-          }
+          pmbootstrap -p $(pwd)/pmaports checksum linux-c13 || exit 1
           
           echo "==================== [执行] 开始编译内核 ===================="
           pmbootstrap -p $(pwd)/pmaports build linux-c13 --arch=aarch64
@@ -71,8 +90,9 @@ jobs:
       - name: Print detailed log on build failure
         if: failure()
         run: |
-          echo "==================== [崩溃日志] 编译内核报错 ===================="
-          cat ~/.local/var/pmbootstrap/log.txt | tail -n 200 || true
+          echo "==================== [崩溃日志] 提取内核底层报错 ===================="
+          # 放弃抓取毫无意义的命令日志，直接输出官方原生报错工具内容
+          pmbootstrap log | tail -n 200 || true
           echo "=================================================================="
 
       - name: Build rootfs image
