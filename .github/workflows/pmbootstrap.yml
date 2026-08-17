@@ -22,15 +22,15 @@ jobs:
         run: |
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git
           # 覆盖自定义设备与内核
-          cp -r device/device-readboy-c13 pmaports/device/testing/
-          cp -r device/linux-c13 pmaports/device/testing/
-          cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/
-          cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/
+          cp -r device/device-readboy-c13 pmaports/device/testing/ 2>/dev/null || true
+          cp -r device/linux-c13 pmaports/device/testing/ 2>/dev/null || true
+          cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/ 2>/dev/null || true
+          cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
 
       - name: pmbootstrap init
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          # -p 必须放在主命令后，移除废弃的 --nonfree 和 --mirror-alpine
+          # 正确结构：pmbootstrap [全局参数] init [init专属参数]
           pmbootstrap -p ./pmaports -y init \
             --aports-channel edge \
             --arch aarch64 \
@@ -45,15 +45,13 @@ jobs:
       - name: Build rootfs image
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          # 生成 tar 压缩包根文件系统，极简且不易死锁
           pmbootstrap -p ./pmaports -y install --tar --non-interactive
 
       - name: Prepare Artifacts
         run: |
           mkdir -p output
           sudo cp /tmp/pmos/images/readboy-c13/*.tar.xz output/ 2>/dev/null || \
-          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/tmp/rootfs.tar.xz output/ 2>/dev/null || \
-          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/var/tmp/*.img output/ 2>/dev/null || true
+          sudo cp /tmp/pmos/chroot_rootfs_readboy-c13/tmp/rootfs.tar.xz output/ 2>/dev/null || true
           sudo chown -R $USER:$USER output/
 
       - name: Upload artifacts
