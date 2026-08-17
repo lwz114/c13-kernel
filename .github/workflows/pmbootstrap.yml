@@ -47,16 +47,23 @@ jobs:
       - name: Build kernel package
         run: |
           export PMBOOTSTRAP_WORKDIR=/tmp/pmos
-          # 【核心修复】在编译前重新计算所有本地源码和补丁的 SHA512 校验和！
-          pmbootstrap -p $(pwd)/pmaports checksum linux-c13
+          
+          echo "==================== [调试] 检查打包目录文件 ===================="
+          ls -la $(pwd)/pmaports/device/testing/linux-c13/ || true
+          
+          echo "==================== [调试] 查看 APKBUILD 源码 ===================="
+          cat $(pwd)/pmaports/device/testing/linux-c13/APKBUILD || true
+          
+          echo "==================== [执行] 重新计算校验和 ===================="
+          # 如果 checksum 失败，立刻打印底层的 abuild 报错并退出！
+          pmbootstrap -p $(pwd)/pmaports checksum linux-c13 || { 
+            echo "==================== [崩溃日志] 校验和失败原因 ====================";
+            cat ~/.local/var/pmbootstrap/log.txt | tail -n 100;
+            exit 1; 
+          }
+          
+          echo "==================== [执行] 开始编译内核 ===================="
           pmbootstrap -p $(pwd)/pmaports build linux-c13 --arch=aarch64
-
-      - name: Print detailed log on failure
-        if: failure()
-        run: |
-          echo "==================== PMBOOTSTRAP LOG ===================="
-          cat ~/.local/var/pmbootstrap/log.txt || true
-          echo "========================================================="
 
       - name: Build rootfs image
         run: |
