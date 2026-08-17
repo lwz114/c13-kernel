@@ -20,14 +20,13 @@ jobs:
       - name: Setup pmaports & Rewrite APKBUILD
         run: |
           git clone --depth 1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git
-          # 拷贝设备配置（跳过原有残缺的 APKBUILD）
+          # 拷贝设备配置
           cp -r device/device-readboy-c13 pmaports/device/testing/ 2>/dev/null || true
           mkdir -p pmaports/device/testing/linux-c13
           cp device/linux-c13/config-c13.aarch64 pmaports/device/testing/linux-c13/ 2>/dev/null || true
           cp device/linux-c13/c13-port.patch pmaports/device/testing/linux-c13/ 2>/dev/null || true
 
-          # 【终极大招】原地生成一个完美契合 Alpine/pmOS 规范的纯净 APKBUILD！
-          # 砍掉所有 Ubuntu 特供写法、错误的跳转、以及重复打补丁逻辑
+          # 生成完美契合 Alpine/pmOS 规范的纯净 APKBUILD
           cat << 'EOF' > pmaports/device/testing/linux-c13/APKBUILD
           # Maintainer: Readboy C13 port
           pkgname=linux-c13
@@ -46,23 +45,27 @@ jobs:
                   config-c13.aarch64
                   c13-port.patch"
           
-          # 对应 GitLab 默认解压的根文件夹名，精准跳转，无需 mv
           builddir="$srcdir/linux-v6.19.5-msm8996"
 
           prepare() {
-              # 自动应用 c13-port.patch
+              # 应用补丁
               default_prepare
+              # 【核心修复】必须进入源码目录再执行配置！
+              cd "$builddir"
               cp "$srcdir/config-c13.aarch64" .config
               make ARCH=arm64 olddefconfig
           }
 
           build() {
               unset LDFLAGS
-              # 移除写死的交叉编译器，让 Alpine crossdirect 全权接管
+              # 确保在源码目录内编译
+              cd "$builddir"
               make ARCH=arm64 -j$(nproc) Image.gz dtbs modules
           }
 
           package() {
+              # 确保在源码目录内提取文件
+              cd "$builddir"
               install -Dm644 arch/arm64/boot/Image.gz "$pkgdir/boot/vmlinuz"
               install -Dm644 arch/arm64/boot/dts/qcom/msm8996-readboy-c13.dtb "$pkgdir/boot/msm8996-readboy-c13.dtb"
               make ARCH=arm64 INSTALL_MOD_PATH="$pkgdir" modules_install
@@ -91,8 +94,7 @@ jobs:
         if: failure()
         run: |
           echo "==================== [崩溃日志] 提取内核底层报错 ===================="
-          # 放弃抓取毫无意义的命令日志，直接输出官方原生报错工具内容
-          pmbootstrap log | tail -n 200 || true
+          cat ~/.local/var/pmbootstrap/log.txt | tail -n 150 || true
           echo "=================================================================="
 
       - name: Build rootfs image
