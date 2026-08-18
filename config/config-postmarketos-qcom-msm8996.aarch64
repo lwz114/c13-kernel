@@ -1842,7 +1842,7 @@ CONFIG_ARM_SCPI_PROTOCOL=y
 CONFIG_DMIID=y
 # CONFIG_DMI_SYSFS is not set
 # CONFIG_FW_CFG_SYSFS is not set
-# CONFIG_SYSFB_SIMPLEFB is not set
+CONFIG_SYSFB_SIMPLEFB=y
 # CONFIG_ARM_FFA_TRANSPORT is not set
 # CONFIG_GOOGLE_FIRMWARE is not set
 
@@ -4421,7 +4421,7 @@ CONFIG_DRM_SCHED=m
 # Drivers for system framebuffers
 #
 # CONFIG_DRM_EFIDRM is not set
-# CONFIG_DRM_SIMPLEDRM is not set
+CONFIG_DRM_SIMPLEDRM=y
 # end of Drivers for system framebuffers
 
 #
